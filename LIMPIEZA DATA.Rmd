@@ -1,0 +1,364 @@
+# Limpiando la data de pobreza por provincia
+
+```{r}
+pobreza = import("provincia_pobreza.xlsx", sheet = 3)
+```
+
+```{r}
+pobreza[3,1] = "Tipo"
+names(pobreza) = pobreza[3,]
+```
+
+```{r}
+pobreza_prov = pobreza[pobreza$Tipo == "Provincia"|
+                         pobreza$Tipo == "Provincia Lima",]
+```
+
+```{r}
+pobreza_prov = pobreza_prov[,c(2,3,40)]
+```
+
+```{r}
+pobreza_prov = pobreza_prov[complete.cases(pobreza_prov),]
+```
+
+```{r}
+str(pobreza_prov)
+```
+
+```{r}
+colnames(pobreza_prov) = c("UBIGEO", "PROVINCIA", "PORCENTAJE_POBREZA")
+```
+
+```{r}
+pobreza_prov$PORCENTAJE_POBREZA = as.numeric(pobreza_prov$PORCENTAJE_POBREZA)
+str(pobreza_prov)
+```
+
+# Limpiando la data de tipo de provincia
+
+```{r}
+tipo = import("provincia_tipo.xlsx")
+str(tipo)
+```
+
+```{r}
+tipo_prov = tipo[-c(1:5, 202:205),]
+```
+
+```{r}
+tipo_prov = tipo_prov[,-1]
+```
+
+```{r}
+names(tipo_prov) = c("UBIGEO",
+                     "PROVINCIA",
+                     "URBANO_ENCUESTA",
+                     "RURAL_ENCUESTA")
+names(tipo_prov)
+```
+
+```{r}
+library(stringr)
+
+tipo_prov$UBIGEO = stringr::str_pad(tipo_prov$UBIGEO,
+                                    4, 
+                                    side = "left", 
+                                    pad = 0)
+```
+
+```{r}
+tipo_prov$TIPO_PROV = ifelse(tipo_prov$URBANO_ENCUESTA>tipo_prov$RURAL_ENCUESTA, 0, 1)
+# 0 es urbano
+# 1 es rural
+```
+
+```{r}
+tipo_prov = tipo_prov[,-c(3,4)]
+```
+
+# Limpiando la data del resultados de elecciones
+
+```{r}
+elecciones = import("resultados_elecciones.xlsx")
+```
+
+```{r}
+elecciones = elecciones[,-c(3:11)]
+```
+
+```{r}
+colnames(elecciones) = c("REGION", "PROVINCIA","ORG_POL", "TIPO", "VOTOS","POR_VOTOS")
+```
+
+```{r}
+elecciones_prov = elecciones[complete.cases(elecciones),]
+```
+
+```{r}
+elecciones_prov = elecciones_prov%>%
+  group_by(PROVINCIA)%>%
+  filter(POR_VOTOS == max(POR_VOTOS))
+```
+
+-   **Data de resultados de las elecciones, codificado en si un partido nacional ganó la elección**
+
+```{r}
+resultados = elecciones_prov%>%
+  mutate(RESULTADO = ifelse(TIPO == "PARTIDO POLÍTICO", 0, 1))
+```
+
+```{r}
+resultados = resultados[,-c(3:6)]
+```
+
+-   **Data para obtener la proporción de participación de los partidos nacionales en las elecciones provinciales**
+
+```{r}
+prop_partidos = elecciones[,-c(3,5,6)]
+```
+
+```{r}
+prop_partidos = prop_partidos[complete.cases(prop_partidos),]
+```
+
+```{r}
+prop_partidos = prop_partidos%>%
+  mutate(TIPO_COD = recode(TIPO, "PARTIDO POLÍTICO" = 1, .default = 0))
+
+```
+
+```{r}
+prop_partidos = prop_partidos[,-3]
+```
+
+```{r}
+prop_partidos1 = aggregate(data=prop_partidos,TIPO_COD~REGION+PROVINCIA,sum)
+
+```
+
+```{r}
+#cambio de nombre a la variable TIPO_COD por CANT_PARTIDOS
+names(prop_partidos1) = c("REGION",
+                     "PROVINCIA",
+                     "CANT_PARTIDOS")
+```
+
+```{r}
+prop_partidos2 = aggregate(data=prop_partidos,TIPO_COD~REGION+PROVINCIA,length)
+```
+
+```{r}
+#cambio de nombre a la variable TIPO_COD por TOTAL_PARTIDOS
+names(prop_partidos2) = c("REGION",
+                     "PROVINCIA",
+                     "TOTAL_PARTIDOS")
+```
+
+```{r}
+#Merge prop_partidos1 y prop_partidos2
+prop_partidos = merge(prop_partidos1, prop_partidos2, 
+              by = 'PROVINCIA',
+              all.x = T)
+```
+
+```{r}
+prop_partidos = prop_partidos[,-4]
+```
+
+```{r}
+prop_partidos$PROP_PARTIDOS = prop_partidos$CANT_PARTIDOS/prop_partidos$TOTAL_PARTIDOS
+```
+
+```{r}
+prop_partidos = prop_partidos[,-c(3,4)]
+```
+
+# Limpiando la data de movilidad ciudadana
+
+```{r}
+mov_ciu = import("vive_distrito.xlsx")
+```
+
+```{r}
+mov_ciu = mov_ciu[,-1]
+```
+
+```{r}
+names(mov_ciu) = c("UBIGEO",
+                   "PROVINCIA",
+                   "SI_PERMANENTE",
+                   "NO_PERMANENTE")
+names(mov_ciu)
+```
+
+```{r}
+mov_prov = mov_ciu[-c(1:5,202:205),]
+```
+
+```{r}
+mov_prov$UBIGEO = stringr::str_pad(mov_prov$UBIGEO,
+                            4, 
+                            side = "left", 
+                            pad = 0)
+```
+
+```{r}
+mov_prov$MOV_PROV = ifelse(mov_prov$SI_PERMANENTE>mov_prov$NO_PERMANENTE, 1, 0)
+# 0 es 'No hay movilidad ciudadana'
+# 1 es 'Sí hay movilidad ciudadana'
+```
+
+```{r}
+mov_prov = mov_prov[,-c(3,4)]
+```
+
+# Unificando las datas
+
+```{r}
+data1 = merge(tipo_prov, mov_prov, 
+              by = 'UBIGEO',
+              all.x = T)
+```
+
+```{r}
+data1 = data1[,-4]
+```
+
+```{r}
+names(data1)[2] = "PROVINCIA"
+```
+
+```{r}
+data1$UBIGEO = stringr::str_pad(data1$UBIGEO,
+                            6, 
+                            side = "right", 
+                            pad = 0)
+```
+
+```{r}
+data2 = merge(data1, pobreza_prov, by = "UBIGEO", all.x = T)
+```
+
+```{r}
+data2 = data2[,-5]
+```
+
+```{r}
+names(data2)[2] = "PROVINCIA"
+```
+
+-   
+
+```{r}
+data3 = merge(prop_partidos, resultados, by = "PROVINCIA", all.x = T)
+```
+
+```{r}
+data3 = data3[,c(4,1,3,5)]
+```
+
+-   Dándole el formato necesario para hacer merge
+
+```{r}
+data2$PROVINCIA = toupper(data2$PROVINCIA)
+```
+
+```{r}
+data2$REGION = str_split(string = data2$PROVINCIA,
+                         pattern = ', PROVINCIA: ',
+                         simplify = T)[,1]
+
+data2$PROVINCIA = str_split(string = data2$PROVINCIA,
+                         pattern = ', PROVINCIA: ',
+                         simplify = T)[,2]
+```
+
+```{r}
+data2 = data2[,c(1,6,2,3,4,5)]
+```
+
+```{r}
+data2[67,2] = "CALLAO"
+data2[67,3] = "CALLAO"
+data2[c(146:148),2] = "MADRE DE DIOS"
+data2[c(146:148),3] = c("TAMBOPATA","MANU","TAHUAMANU")
+```
+
+-   Para observar si hay observaciones que no coinciden
+
+```{r}
+sort(setdiff(data2$PROVINCIA,data3$PROVINCIA))
+```
+
+```{r}
+sort(setdiff(data3$PROVINCIA,data2$PROVINCIA))
+```
+
+```{r}
+data2[data2$PROVINCIA == 'ANTONIO RAYMONDI', 'PROVINCIA'] = 'ANTONIO RAIMONDI'
+data2[data2$PROVINCIA == 'ASUNCIÓN', 'PROVINCIA'] = 'ASUNCION'
+data2[data2$PROVINCIA == 'AZÁNGARO', 'PROVINCIA'] = 'AZANGARO'
+data2[data2$PROVINCIA == 'BOLÍVAR', 'PROVINCIA'] = 'BOLIVAR'
+data2[data2$PROVINCIA == 'CAMANÁ', 'PROVINCIA'] = 'CAMANA'
+data2[data2$PROVINCIA == 'CARAVELÍ', 'PROVINCIA'] = 'CARAVELI'
+data2[data2$PROVINCIA == 'CARLOS FERMÍN FITZCARRALD', 'PROVINCIA'] = 'CARLOS FERMIN FITZCARRALD'
+data2[data2$PROVINCIA == 'CELENDÍN', 'PROVINCIA'] = 'CELENDIN'
+data2[data2$PROVINCIA == 'CHEPÉN', 'PROVINCIA'] = 'CHEPEN'
+data2[data2$PROVINCIA == 'CONCEPCIÓN', 'PROVINCIA'] = 'CONCEPCION'
+data2[data2$PROVINCIA == 'CONTUMAZÁ', 'PROVINCIA'] = 'CONTUMAZA'
+data2[data2$PROVINCIA == 'DANIEL ALCIDES CARRIÓN', 'PROVINCIA'] = 'DANIEL ALCIDES CARRION'
+data2[data2$PROVINCIA == 'DATEM DEL MARAÑÓN', 'PROVINCIA'] = 'DATEM DEL MARAÑON'
+data2[data2$PROVINCIA == 'GENERAL SÁNCHEZ CERRO', 'PROVINCIA'] = 'GENERAL SANCHEZ CERRO'
+data2[data2$PROVINCIA == 'GRAN CHIMÚ', 'PROVINCIA'] = 'GRAN CHIMU'
+data2[data2$PROVINCIA == 'HUAMALÍES', 'PROVINCIA'] = 'HUAMALIES'
+data2[data2$PROVINCIA == 'HUANCANÉ', 'PROVINCIA'] = 'HUANCANE'
+data2[data2$PROVINCIA == 'HUÁNUCO', 'PROVINCIA'] = 'HUANUCO'
+data2[data2$PROVINCIA == 'HUAROCHIRÍ', 'PROVINCIA'] = 'HUAROCHIRI'
+data2[data2$PROVINCIA == 'HUAYTARÁ', 'PROVINCIA'] = 'HUAYTARA'
+data2[data2$PROVINCIA == 'JAÉN', 'PROVINCIA'] = 'JAEN'
+data2[data2$PROVINCIA == 'JULCÁN', 'PROVINCIA'] = 'JULCAN'
+data2[data2$PROVINCIA == 'JUNÍN', 'PROVINCIA'] = 'JUNIN'
+data2[data2$PROVINCIA == 'LA CONVENCIÓN', 'PROVINCIA'] = 'LA CONVENCION'
+data2[data2$PROVINCIA == 'LA UNIÓN', 'PROVINCIA'] = 'LA UNION'
+data2[data2$PROVINCIA == 'MARAÑÓN', 'PROVINCIA'] = 'MARAÑON'
+data2[data2$PROVINCIA == 'MARISCAL CÁCERES', 'PROVINCIA'] = 'MARISCAL CACERES'
+data2[data2$PROVINCIA == 'MARISCAL RAMÓN CASTILLA', 'PROVINCIA'] = 'MARISCAL RAMON CASTILLA'
+data2[data2$PROVINCIA == 'MORROPÓN', 'PROVINCIA'] = 'MORROPON'
+data2[data2$PROVINCIA == 'NAZCA', 'PROVINCIA'] = 'NASCA'
+data2[data2$PROVINCIA == 'OYÓN', 'PROVINCIA'] = 'OYON'
+data2[data2$PROVINCIA == 'PÁUCAR DEL SARA SARA', 'PROVINCIA'] = 'PAUCAR DEL SARA SARA'
+data2[data2$PROVINCIA == 'PURÚS', 'PROVINCIA'] = 'PURUS'
+data2[data2$PROVINCIA == 'RODRÍGUEZ DE MENDOZA', 'PROVINCIA'] = 'RODRIGUEZ DE MENDOZA'
+data2[data2$PROVINCIA == 'SAN MARTÍN', 'PROVINCIA'] = 'SAN MARTIN'
+data2[data2$PROVINCIA == 'SAN ROMÁN', 'PROVINCIA'] = 'SAN ROMAN'
+data2[data2$PROVINCIA == 'SÁNCHEZ CARRIÓN', 'PROVINCIA'] = 'SANCHEZ CARRION'
+data2[data2$PROVINCIA == 'VÍCTOR FAJARDO', 'PROVINCIA'] = 'VICTOR FAJARDO'
+data2[data2$PROVINCIA == 'VILCAS HUAMÁN', 'PROVINCIA'] = 'VILCAS HUAMAN'
+data2[data2$PROVINCIA == 'VIRÚ', 'PROVINCIA'] = 'VIRU'
+```
+
+-   Realizamos el merge
+
+```{r}
+data = merge(data2, data3, by = "PROVINCIA", all.x = T)
+```
+
+-   Ordenamos
+
+```{r}
+data = data[, c(2,3,1,4,5,6,8,9)]
+```
+
+```{r}
+names(data) = c("UBIGEO", "REGION", "PROVINCIA", "TIPO_PROV","MOVILIZACION_PROV","PORCENTAJE_POBREZA", "PROPORCION_PARTIDOS", "RESULTADO")
+```
+
+```{r}
+data = arrange(data, UBIGEO)
+```
+
+```{r}
+library(openxlsx)
+write.xlsx(data,"clean_data.xlsx", rowNames = F)
+```

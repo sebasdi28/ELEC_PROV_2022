@@ -1,0 +1,256 @@
+---
+title: "Partidos Políticos Nacionales y Participación en las Elecciones Municipales Provinciales 2021"
+author: "Sebastián Díaz Bocanegra (20211702), Selna Lopez Trujillo (20202721)"
+output: 
+  flexdashboard::flex_dashboard:
+    vertical_layout: fill
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(rio)
+library(sf)
+library(ggplot2)
+library(cluster)
+library(kableExtra)
+library(modelsummary)
+library(colorBlindness)
+
+data_graf = import("clean_data.xlsx")
+map = sf::read_sf("INEI_LIMITE_PROVINCIAL_196_GEOGPSPERU_JUANSUYO_931381206.shp")
+```
+
+```{r include=FALSE}
+data_graf$RESULTADO = factor(data_graf$RESULTADO,
+                             labels = c("No", "Sí"))
+
+map[map$NOMBPROV == 'ANTONIO RAYMONDI', 'NOMBPROV'] = 'ANTONIO RAIMONDI'
+map[map$NOMBPROV == 'CAÑ\u0091ETE', 'NOMBPROV'] = 'CAÑETE'
+map[map$NOMBPROV == 'FERREÑ\u0091AFE', 'NOMBPROV'] = 'FERREÑAFE'
+
+data_map = merge(map, data_graf,
+                 by.x = "NOMBPROV",
+                 by.y = "PROVINCIA",
+                 all.x = T)
+
+```
+
+```{r include=FALSE}
+dataClus=data_graf[,c(4:7)]
+row.names(dataClus)=data_graf$PROVINCIA
+
+g.dist = daisy(dataClus, metric="gower")
+
+library(factoextra)
+res.agnes<- hcut(g.dist, k = 3,hc_func='agnes',hc_method = "ward.D")
+
+dataClus$agnes=res.agnes$cluster
+
+# ver
+
+head(dataClus,15)%>%kbl()%>%kable_styling()
+
+
+fviz_silhouette(res.agnes,print.summary = F)
+
+#ha sido la que mejor silueta ha presentado
+```
+
+# Performance partidario a nivel subnacional
+
+## Column {data-width="500"}
+
+### Mapa de elección partidaria por provincia
+
+```{r}
+mapaleyendaL= ggplot(data_map)+ geom_sf() + theme_light()
+
+mapaleyL= mapaleyendaL + geom_sf(data=data_map,
+              aes(fill=RESULTADO),color = "black")
+      
+mapa1= mapaleyL +
+  coord_sf() + 
+  scale_fill_manual(values=c("#C3E57E","#51A3CC")) + 
+  theme_void() +
+  
+  theme(axis.title = element_blank(), axis.text = element_blank(), legend.position = "bottom") + 
+  labs(fill=" ") + 
+  theme(legend.text = element_text(size = 8)) +
+  
+labs(title = "¿Ganó una organización subnacional?") +
+  
+theme(
+plot.title = element_text(color="black", size=11, face="bold"))
+
+mapa1
+
+
+```
+
+## Column {data-width="500"}
+
+### Gráfico circular
+
+```{r}
+data_graf$RESULTADO = factor(data_graf$RESULTADO,
+                             labels = c("No", "Sí"))
+
+graf2 = as.data.frame(prop.table(table(data_graf$RESULTADO))*100)
+colnames(graf2) = c("Ganó","Freq")
+
+library(ggplot2)
+ggplot(graf2, aes(x="", y=Freq, fill=Ganó)) + 
+  geom_bar(stat="identity") + 
+  geom_text(aes(label=paste(round(Freq,2), "%", sep="")), color=c("black","white"), size=7, face="bold",
+            position=position_stack(vjust=0.5), size=5)+
+  coord_polar("y") + 
+  ggtitle("¿Ganó una organización subnacional en las elecciones municipales provinciales 2022?") + 
+  theme_void() + scale_fill_manual(values=c("#C3E57E","#51A3CC"))
+
+```
+
+### ¿Qué quiere decir esto?
+
+-   Tanto el mapa como el gráfico circular nos muestran que, en las elecciones provinciales del 2022, los movimientos regionales lograron imponerse, marcadamente, sobre los partidos políticos y ocuparon la mayoría de las municipalidades provinciales
+
+-   Una de las posibles explicaciones es que los peruanos prefieren la representación y cercanía de autoridades locales El rechazo a los partidos nacionales puede entenderse también como cierto hartazgo de la ineficiencia y desconexión entre la sociedad civil y partidos tradicionales
+
+-   También se puede evidenciar un aumento de la fragmentación política de nuestro país: mientras ciertas regiones prefieren la representación tradicional, la otra mayoría busca nuevas opciones en los gobiernos locales
+
+-   Finalmente, los gráficos confirman la literatura sobre la crisis de los partido políticos y su sustitución por movimiento regionales
+
+# Análisis de conglomerados
+
+## Column {data-width="500"}
+
+### Tabla con las Medias por Conglomerados
+
+```{r}
+library(dplyr)
+tablaClus = dataClus %>% 
+  group_by(agnes) %>%
+  summarize (NUMERODECLUSTERS = n(),
+             PRIMERPROMEDIO = round(mean(TIPO_PROV, na.rm = T)*100,2),
+             SEGUNDOPROMEDIO = round(mean(MOVILIZACION_PROV, na.rm = T)*100,2),
+             TERCERPROMEDIO = round(mean(PORCENTAJE_POBREZA, na.rm = T),2),
+             CUARTOPROMEDIO = round(mean(PROPORCION_PARTIDOS, na.rm = T)*100,2))
+```
+
+```{r}
+colnames(tablaClus) <- c("CLUSTER",
+                        "NÚMERO PROVINCIAS",
+                        "PROPORCIÓN RURAL (%)",
+                        "PROPORCIÓN MOVILIDAD CIUDADANA (%)",
+                        "PROMEDIO POBREZA (%)", 
+                        "PROMEDIO PARTICIPACIÓN PARTIDOS NACIONALES (%)")
+```
+
+```{r}
+tablaClus%>%
+  kable(caption = "Tabla de Promedios por Agrupación de Conglomerado")%>%
+  kableExtra::kable_styling(full_width = T)
+```
+
+### ¿Qué quiere decir esto?
+
+-   El análisis de conglomerados recomendaba no agrupar los casos; sin embargo, para fines de análisis, se asociaron los casos en tres grupos. Cabe resaltar que utilizando el método AGNES, se pudieron conglomerar adecuadamente todos los casos 
+
+-   El primer cluster muestra que existen 59 provincias urbanas con alta movilidad ciudadana, cuyo porcentaje de pobreza es relativamente bajo con un 32.77% y en la que participan una mayor cantidad de partidos nacionales
+
+-   El segundo cluster muestra que existen 54 provincias rurales con alta movilidad ciudadana, cuyo porcentaje de pobreza también es relativamente bajo con un 29.10% y en la que la participación de movimientos regionales supera a la de los partidos nacionales por 4.11 puntos porcentuales
+
+-   El último cluster muestra que existen 83 provincias con una mayoría de población rural y escasísima movilidad ciudadana, con un porcentaje de pobreza relativamente bajo con un 33.49% y cuya participación de partidos nacionales supera en 3.93 % a la de movimientos regionales.
+
+
+## Column {data-width="500"}
+
+### Mapa de provincias por agrupación de conglomerados (AGNES)
+
+```{r}
+data_map2 = merge(map, dataClus,
+                 by.x = "NOMBPROV",
+                 by.y = 'row.names',
+                 all.x = T)
+#MAPA
+
+mapaleyendaL2= ggplot(data_map2)+ geom_sf() + theme_light()
+
+mapaleyL2= mapaleyendaL2 + geom_sf(data=data_map2,
+              aes(fill=factor(`agnes`)),color = "black")
+      
+mapa2= mapaleyL2 +
+  coord_sf() + scale_fill_manual(values=c("#A3CC51","#51A3CC","#6551CC" )) +
+  theme_void() +
+  
+  theme(axis.title = element_blank(), 
+        axis.text = element_blank(),
+        legend.position = "left") + 
+  labs(fill=" ") + 
+  theme(legend.text = element_text(size = 8)) +
+  
+labs(title = "Distribución Espacial de conglomerados") +
+  
+  theme(
+  plot.title = element_text(color="black", size=11, face="bold"))
+
+mapa2
+
+```
+
+# Modelamiento de la variable dependiente
+
+## Column {data-width="600"}
+
+### Modelos de regresión
+
+```{r}
+model1 = glm(RESULTADO ~ TIPO_PROV + MOVILIZACION_PROV + PORCENTAJE_POBREZA, data = data_graf, family = binomial)
+
+model2 = glm(RESULTADO ~ TIPO_PROV + MOVILIZACION_PROV + PORCENTAJE_POBREZA + PROPORCION_PARTIDOS, data = data_graf, family = binomial)
+
+modelsrl=list('Voto por agrupación subnacional (I)'=model1,
+              'Voto por agrupación subnacional (I) Exponenciado'=model1,
+              'Voto por agrupación subnacional (II)'=model2,
+              'Voto por agrupación subnacional (II) Exponenciado'=model2)
+
+formatoNumero = function(x) format(x, digits = 4, scientific = FALSE)
+modelsummary(modelsrl,
+             fmt=formatoNumero, # usa función que creé antes
+             exponentiate = c(F,T,F,T),
+             statistic = 'conf.int',
+             title = "Regresión Logísticas (Coeficientes Exponenciados)",
+             stars = TRUE,
+             output = "kableExtra")
+```
+
+## Column {data-width=400} {.tabset}
+
+### Efectos marginales
+
+```{r}
+library(margins)
+ 
+marginalsData = summary(margins(model2))
+marginalsData = marginalsData[,-c(4,5)]
+marginalsData%>%
+  kable(caption = "Efectos Marginales Promedio (AME) - Modelo II")%>%
+  kableExtra::kable_styling(full_width = T)
+```
+
+### Gráfico de Barras de Error
+
+```{r}
+ggplot(marginalsData, aes(x=factor, y=AME))+
+  geom_point()+ 
+  geom_errorbar(aes(ymin=lower, ymax=upper),
+                color = c("#CC8E51","#A3CC51","#51A3CC","#6551CC"),
+                width = 0.4,
+                size = 0.5) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+### ¿Qué quiere decir esto?
+
+-   De acuerdo con los resultados, si analizamos el éxito de que un movimiento regional gane, podemos observar que las variables tipo de provincia, movilización ciudadana y porcentaje de pobreza no tienen un efecto significativo en este resultado
+
+-   Sin embargo, si le agregamos la variable de control (proporción de partidos nacionales sobre partidos totales), podemos observar que la única variable que adquiere significancia es el porcentaje de pobreza con un impacto mínimo en la probabilidad del evento: que gane un partido regional
