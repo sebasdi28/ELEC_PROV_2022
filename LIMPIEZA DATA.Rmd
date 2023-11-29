@@ -1,6 +1,7 @@
 # Limpiando la data de pobreza por provincia
 
 ```{r}
+library(rio)
 pobreza = import("provincia_pobreza.xlsx", sheet = 3)
 ```
 
@@ -96,6 +97,7 @@ elecciones_prov = elecciones[complete.cases(elecciones),]
 ```
 
 ```{r}
+library(dplyr)
 elecciones_prov = elecciones_prov%>%
   group_by(PROVINCIA)%>%
   filter(POR_VOTOS == max(POR_VOTOS))
