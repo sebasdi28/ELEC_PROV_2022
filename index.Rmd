@@ -1,6 +1,6 @@
 ---
 title: "Partidos Políticos Nacionales y Participación en las Elecciones Municipales Provinciales 2021"
-author: "Sebastián Díaz Bocanegra (20211702), Selna Lopez Trujillo (20202721)"
+author: "Sebastián Díaz Bocanegra (20211702), Selena Lopez Trujillo (20202721)"
 output: 
   flexdashboard::flex_dashboard:
     vertical_layout: fill
