@@ -226,6 +226,16 @@ modelsummary(modelsrl,
 
 ## Column {data-width=400} {.tabset}
 
+
+### Tabla ANOVA
+```{r}
+library(lmtest)
+
+lrtest(model1,model2) %>%
+kable(caption = "Tabla LRT para comparar modelos")%>%kableExtra::kable_styling(full_width = FALSE)
+```
+
+
 ### Efectos marginales
 
 ```{r}
@@ -249,6 +259,7 @@ ggplot(marginalsData, aes(x=factor, y=AME))+
                 size = 0.8) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
+
 
 ### ¿Qué quiere decir esto?
 
