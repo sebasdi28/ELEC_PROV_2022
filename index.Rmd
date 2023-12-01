@@ -104,8 +104,9 @@ ggplot(graf2, aes(x="", y=Freq, fill=Ganó)) +
   geom_text(aes(label=paste(round(Freq,2), "%", sep="")), color=c("black","white"), size=7, face="bold",
             position=position_stack(vjust=0.5), size=5)+
   coord_polar("y") + 
-  ggtitle("¿Ganó una organización subnacional en las elecciones municipales provinciales 2022?") + 
-  theme_void() + scale_fill_manual(values=c("#C3E57E","#51A3CC"))
+  ggtitle("¿Ganó una organización subnacional en las EMP de 2022?") + 
+  theme_void() + scale_fill_manual(values=c("#C3E57E","#51A3CC"))+
+  theme(plot.title = element_text(hjust = 0.5, face = "bold", lineheight = 1.1))
 
 ```
 
@@ -188,7 +189,7 @@ mapa2= mapaleyL2 +
   labs(fill=" ") + 
   theme(legend.text = element_text(size = 8)) +
   
-labs(title = "Distribución Espacial de conglomerados") +
+labs(title = "Distribución Espacial de Conglomerados") +
   
   theme(
   plot.title = element_text(color="black", size=11, face="bold"))
